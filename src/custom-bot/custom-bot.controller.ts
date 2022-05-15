@@ -24,4 +24,14 @@ export class CustomBotController {
   public deleteBot(id: number, query: CallbackQuery): Promise<Message> {
     return this.customBotService.deleteBot(id, query);
   }
+
+  @Controller('stopBot', ControllerType.callbackQuery)
+  public stop(id: number, query: CallbackQuery): Promise<Message> {
+    return this.customBotService.stopBot(id, query);
+  }
+
+  @Controller('startBot', ControllerType.callbackQuery)
+  public restart(id: number, query: CallbackQuery): Promise<Message> {
+    return this.customBotService.restartBot(id, query);
+  }
 }

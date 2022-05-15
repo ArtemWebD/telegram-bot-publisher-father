@@ -5,7 +5,7 @@ import { TaskManager } from '../task-manager/TaskManager';
 import { CustomBotConsumer } from './custom-bot.consumer';
 import Database from '../database/Database';
 import { Repository } from 'typeorm';
-import { CustomBotEntity } from './entities/custom-bot.entity';
+import { BotActive, CustomBotEntity } from './entities/custom-bot.entity';
 import axios from 'axios';
 
 @TgBot
@@ -55,28 +55,32 @@ export class CustomBotService {
       if (!bot) {
         return this.bot.sendMessage(query.from.id, 'Бот не найден');
       }
-      return this.bot.sendMessage(query.from.id, `Бот: ${bot.firstname}\n\n` + `Статус: ${bot.active}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: 'Запустить',
-                callback_data: JSON.stringify({ type: 'startBot', data: bot.id }),
-              },
-              {
-                text: 'Остановить',
-                callback_data: JSON.stringify({ type: 'stopBot', data: bot.id }),
-              },
+      return this.bot.sendMessage(
+        query.from.id,
+        `Бот: ${bot.firstname}\n\n` + `Статус: ${bot.active}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'Запустить',
+                  callback_data: JSON.stringify({ type: 'startBot', data: bot.id }),
+                },
+                {
+                  text: 'Остановить',
+                  callback_data: JSON.stringify({ type: 'stopBot', data: bot.id }),
+                },
+              ],
+              [
+                {
+                  text: 'Удалить',
+                  callback_data: JSON.stringify({ type: 'deleteBot', data: bot.id }),
+                },
+              ],
             ],
-            [
-              {
-                text: 'Удалить',
-                callback_data: JSON.stringify({ type: 'deleteBot', data: bot.id }),
-              },
-            ],
-          ],
+          },
         },
-      });
+      );
     } catch (error: any) {
       throw new Error(error);
     }
@@ -89,9 +93,45 @@ export class CustomBotService {
         return this.bot.sendMessage(query.from.id, 'Бот не найден');
       }
       await this.stop(bot.name);
-      await this.deleteImage(bot.name); 
+      await this.deleteImage(bot.name);
       await this.customBotRepository.delete({ id });
       return this.bot.sendMessage(query.from.id, `Бот успешно остановлен и удален`);
+    } catch (error: any) {
+      throw new Error(error);
+    }
+  }
+
+  public async stopBot(id: number, query: CallbackQuery): Promise<Message> {
+    try {
+      const bot = await this.customBotRepository.findOneBy({ id });
+      if (!bot) {
+        return this.bot.sendMessage(query.from.id, 'Бот не найден');
+      }
+      if (bot.active === BotActive.paused) {
+        return this.bot.sendMessage(query.from.id, 'Бот уже остановлен');
+      }
+      await this.stop(bot.name);
+      bot.active = BotActive.paused;
+      await this.customBotRepository.save(bot);
+      return this.bot.sendMessage(query.from.id, 'Бот успешно остановлен');
+    } catch (error: any) {
+      throw new Error(error);
+    }
+  }
+
+  public async restartBot(id: number, query: CallbackQuery): Promise<Message> {
+    try {
+      const bot = await this.customBotRepository.findOneBy({ id });
+      if (!bot) {
+        return this.bot.sendMessage(query.from.id, 'Бот не найден');
+      }
+      if (bot.active === BotActive.on) {
+        return this.bot.sendMessage(query.from.id, 'Бот уже запущен');
+      }
+      await this.start(bot.name);
+      bot.active = BotActive.on;
+      await this.customBotRepository.save(bot);
+      return this.bot.sendMessage(query.from.id, 'Бот успешно запущен, через несколько секунд он приступит к работе');
     } catch (error: any) {
       throw new Error(error);
     }
@@ -136,15 +176,12 @@ export class CustomBotService {
   private deleteImage(name: string): Promise<void> {
     try {
       return new Promise<void>((resolve, reject) => {
-        exec(
-          `docker rmi -f ${name}`,
-          (error) => {
-            if (error) {
-              reject(error);
-            }
-            resolve();
-          },
-        );
+        exec(`docker rmi -f ${name}`, (error) => {
+          if (error) {
+            reject(error);
+          }
+          resolve();
+        });
       });
     } catch (error: any) {
       throw new Error(error);
