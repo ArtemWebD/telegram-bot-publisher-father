@@ -48,7 +48,7 @@ export class CustomBotConsumer {
   private async copySource(token: string): Promise<string> {
     try {
       const name = uuid.v4();
-      const sourcePath = path.resolve(__dirname, 'template');
+      const sourcePath = path.resolve(__dirname, '../../template');
       const userSourcePath = path.resolve(__dirname, `bots/${name}`);
       await fs.cp(sourcePath, userSourcePath, { recursive: true });
       const configPath = path.resolve(__dirname, `bots/${name}/config/default.json`)
